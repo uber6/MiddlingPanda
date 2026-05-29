@@ -164,6 +164,8 @@ OpenSSH 9+ clients **cannot load** `id_dsa` (`Load key: unknown or unsupported k
 
    Or set `MPANDA_UPSTREAM_IDENTITY=~/.ssh/id_dsa`.
 
+   Use an **absolute path** or `~/…` for `--upstream-identity`. OpenSSH runs `ProxyCommand` with cwd `$HOME`, so `./id_dsa` only works if the key lives in your home directory. A broken `id_dsa.pub` (e.g. from `ssh-keygen -y` when the client cannot load DSA) is ignored; libssh2 reads the private key instead.
+
 **Alternative on the server:** keep `HostkeyAlgorithms ssh-dss` but allow modern user keys:
 
 ```text

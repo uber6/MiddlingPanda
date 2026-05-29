@@ -120,13 +120,13 @@ fn try_key_file(
         }
     }
 
-    let private_pem = secret
-        .to_openssh(ssh_key::LineEnding::LF)
-        .context("encode private key")?;
-    let public_openssh = disk_public.to_openssh().context("encode public key")?;
-
+    // Prefer letting libssh2 read the private key; only pass .pub if it looks valid.
+    let public_path = public_key_path(private_path);
     session
-        .userauth_pubkey_memory(user, Some(&public_openssh), &private_pem, None)
+        .userauth_pubkey_file(user, public_path.as_deref(), private_path, None)
+        .or_else(|_| {
+            session.userauth_pubkey_file(user, None, private_path, None)
+        })
         .map_err(|e| anyhow::anyhow!("pubkey auth with {}: {e}", private_path.display()))?;
 
     if session.authenticated() {
@@ -146,7 +146,25 @@ fn ssh_dir() -> Option<PathBuf> {
     dirs::home_dir().map(|h| h.join(".ssh"))
 }
 
+/// `id_dsa` → `id_dsa.pub` beside the private key (must look like an OpenSSH one-line key).
+fn public_key_path(private_path: &Path) -> Option<PathBuf> {
+    let parent = private_path.parent().unwrap_or_else(|| Path::new("."));
+    let stem = private_path.file_stem()?;
+    let candidate = parent.join(format!("{}.pub", stem.to_string_lossy()));
+    if !candidate.is_file() {
+        return None;
+    }
+    let Ok(contents) = std::fs::read_to_string(&candidate) else {
+        return None;
+    };
+    let line = contents.lines().next()?.trim();
+    if line.len() < 80 || !(line.starts_with("ssh-rsa ") || line.starts_with("ssh-dss ") || line.starts_with("ssh-ed25519 ") || line.starts_with("ecdsa-sha2-")) {
+        return None;
+    }
+    Some(candidate)
+}
+
 fn dsa_auth_hint() -> &'static str {
-    "\nHint: for ssh-dss keys set OPENSSL_CONF to config/openssl-legacy.cnf (OpenSSL 3 legacy provider). \
-     Ensure id_dsa.pub is beside the private key."
+    "\nHint: for ssh-dss keys you may need OPENSSL_CONF=config/openssl-legacy.cnf (OpenSSL 3). \
+     If id_dsa.pub is invalid, remove it or regenerate with ssh-keygen on a host that supports DSA."
 }

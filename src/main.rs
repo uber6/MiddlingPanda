@@ -115,17 +115,63 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Turn a user-supplied identity path into an absolute path (ProxyCommand cwd varies).
+/// Resolve `--upstream-identity` to an existing file.
+///
+/// OpenSSH runs ProxyCommand with cwd usually `$HOME`, not the directory where you
+/// ran `ssh`, so relative paths are tried against home, then cwd, then the binary dir.
 fn resolve_identity_path(path: &std::path::Path) -> anyhow::Result<PathBuf> {
-    let candidate = if path.is_relative() {
-        let cwd = std::env::current_dir().context("current directory for --upstream-identity")?;
-        cwd.join(path)
-    } else {
-        path.to_path_buf()
-    };
-    if !candidate.is_file() {
-        anyhow::bail!("upstream identity not found: {}", path.display());
+    let expanded = expand_tilde(path);
+
+    if expanded.is_absolute() {
+        return existing_file(expanded);
     }
-    std::fs::canonicalize(&candidate)
-        .with_context(|| format!("resolve identity path {}", path.display()))
+
+    let mut candidates: Vec<PathBuf> = Vec::new();
+    if let Ok(cwd) = std::env::current_dir() {
+        candidates.push(cwd.join(&expanded));
+    }
+    if let Some(home) = dirs::home_dir() {
+        candidates.push(home.join(&expanded));
+    }
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(dir) = exe.parent() {
+            candidates.push(dir.join(&expanded));
+        }
+    }
+
+    for candidate in candidates {
+        if candidate.is_file() {
+            return Ok(candidate);
+        }
+    }
+
+    anyhow::bail!(
+        "upstream identity not found: {} (tried relative to $HOME, cwd, and binary directory)",
+        path.display()
+    );
+}
+
+fn expand_tilde(path: &std::path::Path) -> PathBuf {
+    let Some(s) = path.to_str() else {
+        return path.to_path_buf();
+    };
+    if let Some(rest) = s.strip_prefix("~/") {
+        if let Some(home) = dirs::home_dir() {
+            return home.join(rest);
+        }
+    }
+    if s == "~" {
+        if let Some(home) = dirs::home_dir() {
+            return home;
+        }
+    }
+    path.to_path_buf()
+}
+
+fn existing_file(path: PathBuf) -> anyhow::Result<PathBuf> {
+    if path.is_file() {
+        Ok(path)
+    } else {
+        anyhow::bail!("upstream identity not found: {}", path.display())
+    }
 }
