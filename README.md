@@ -36,14 +36,26 @@ libssh2 is compiled with **OpenSSL** from your system.
 
 ### Static musl binary
 
-For a fully static Linux binary (e.g. portable deploy), install the musl target and build:
+For a fully static Linux binary (e.g. portable deploy). Musl builds use **vendored OpenSSL** (no `libssl-dev` / `openssl-devel` needed). Install host build tools and the musl linker, then add the Rust target:
+
+**Fedora / RHEL:**
+
+```bash
+sudo dnf install gcc make perl musl-gcc
+```
+
+**Debian / Ubuntu:**
+
+```bash
+sudo apt install build-essential perl musl-tools
+```
 
 ```bash
 rustup target add x86_64-unknown-linux-musl
 cargo build --release --target x86_64-unknown-linux-musl
 ```
 
-The binary is `target/x86_64-unknown-linux-musl/release/middling-panda`. For musl, `ssh2` enables **vendored OpenSSL** automatically (system `pkg-config` cannot cross-link OpenSSL to musl). The first musl build compiles OpenSSL from source and takes longer; you still need `gcc`, `make`, and `perl` on the host.
+The binary is `target/x86_64-unknown-linux-musl/release/middling-panda`. The first musl build compiles OpenSSL from source and takes longer. With the release profile in `Cargo.toml`, expect roughly **~7 MiB** for the static binary (default release settings are larger).
 
 ### Building with `ssh-dss`
 
