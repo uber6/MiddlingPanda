@@ -84,23 +84,53 @@ middling-panda --upstream-identity ~/.ssh/id_dsa \
   probe -u admin -v legacy-device.example 22
 ```
 
-### Data directory
+## Artifacts
 
-Defaults to `~/.middling-panda/`:
+MiddlingPanda only writes under its **data directory** (default `~/.middling-panda/`, override with `--data-dir`). It does not modify `~/.ssh/` or your shell history.
 
-| File | Purpose |
-|------|---------|
-| `id_ed25519` | MiddlingPanda host key (modern leg — what your SSH client sees) |
-| `known_hosts` | Legacy device host keys (panda → device trust) |
+| Path | Created when | Purpose |
+|------|----------------|---------|
+| `id_ed25519` | First `proxy` session (or first use of `server_config`) | **Downstream** Ed25519 host key. This is what your OpenSSH client pins when you connect through the proxy. Regenerated only if you delete the file. Mode `0600` on Unix. |
+| `known_hosts` | First successful upstream connect to a host (unless `--no-verify-upstream`) | **Upstream** trust store in OpenSSH `known_hosts` format. Pins the **real** legacy device keys (e.g. `ssh-dss`). Grows as you reach new `host:port` pairs. |
 
-Override with `--data-dir /path/to/dir`.
+Example layout after use:
 
-Lab only: `--no-verify-upstream` skips pinning/checking legacy host keys.
+```text
+~/.middling-panda/
+├── id_ed25519      # private key, PEM (MiddlingPanda as SSH "server")
+└── known_hosts     # legacy device host keys (MiddlingPanda as SSH client)
+```
 
-If `probe` reports **host key mismatch** after upgrading MiddlingPanda, remove the stale pin (older builds could store `ssh-dss` incorrectly):
+### What MiddlingPanda does *not* write
+
+| Item | Notes |
+|------|--------|
+| Your `~/.ssh/known_hosts` | OpenSSH updates this when **you** accept the proxy’s host key (the `id_ed25519` fingerprint), not MiddlingPanda itself. |
+| `~/.ssh/authorized_keys` | Unchanged; configure keys on the **legacy** server as usual. |
+| `--upstream-identity` key files | Read-only; typically `~/.ssh/id_dsa` or a path you pass on the command line. |
+| Logs | Diagnostics go to **stderr** only (no log files by default). |
+
+### Managing artifacts
+
+**Custom data directory** (per user, lab, or project):
+
+```bash
+middling-panda --data-dir /var/lib/middling-panda proxy legacy-device.example 22
+```
+
+**Lab / no upstream pinning:** `--no-verify-upstream` — `known_hosts` is not read or updated.
+
+**Rotate the downstream (client-visible) host key** — delete `id_ed25519`, then connect again (your SSH client will warn about a changed key):
+
+```bash
+rm ~/.middling-panda/id_ed25519
+```
+
+**Fix a stale upstream pin** (e.g. after an older build stored `ssh-dss` incorrectly):
 
 ```bash
 ssh-keygen -R 'legacy-device.example' -f ~/.middling-panda/known_hosts
+ssh-keygen -R '[legacy-device.example]:2222' -f ~/.middling-panda/known_hosts   # non-default port
 middling-panda probe -v legacy-device.example 22
 ```
 
