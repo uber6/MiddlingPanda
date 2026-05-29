@@ -21,3 +21,7 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 ssh2 = { version = "0.9", default-features = false }
+
+# libssh2-sys links OpenSSL via pkg-config on Unix; that breaks for musl cross-builds.
+[target.'cfg(target_env = "musl")'.dependencies]
+ssh2 = { version = "0.9", default-features = false, features = ["vendored-openssl"] }

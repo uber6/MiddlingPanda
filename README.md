@@ -34,6 +34,17 @@ The binary is `target/release/middling-panda`.
 
 libssh2 is compiled with **OpenSSL** from your system.
 
+### Static musl binary
+
+For a fully static Linux binary (e.g. portable deploy), install the musl target and build:
+
+```bash
+rustup target add x86_64-unknown-linux-musl
+cargo build --release --target x86_64-unknown-linux-musl
+```
+
+The binary is `target/x86_64-unknown-linux-musl/release/middling-panda`. For musl, `ssh2` enables **vendored OpenSSL** automatically (system `pkg-config` cannot cross-link OpenSSL to musl). The first musl build compiles OpenSSL from source and takes longer; you still need `gcc`, `make`, and `perl` on the host.
+
 ### Building with `ssh-dss`
 
 **libssh2 1.11+ disables `ssh-dss` by default.** This repo sets `CFLAGS=-DLIBSSH2_DSA_ENABLE` in [`.cargo/config.toml`](.cargo/config.toml) so the vendored libssh2 from `ssh2` includes DSA host keys.
