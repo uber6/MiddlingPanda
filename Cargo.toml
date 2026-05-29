@@ -25,3 +25,10 @@ ssh2 = { version = "0.9", default-features = false }
 # libssh2-sys links OpenSSL via pkg-config on Unix; that breaks for musl cross-builds.
 [target.'cfg(target_env = "musl")'.dependencies]
 ssh2 = { version = "0.9", default-features = false, features = ["vendored-openssl"] }
+
+[profile.release]
+opt-level = "z"
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = true
