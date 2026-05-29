@@ -24,9 +24,7 @@ pub fn userauth_identity_file(session: &Session, user: &str, private_path: &Path
         anyhow::bail!("upstream identity not found: {}", private_path.display());
     }
     try_key_file(session, user, None, private_path).map_err(|e| {
-        anyhow::anyhow!(
-            "{e}\nHint: for ssh-dss keys set OPENSSL_CONF to a legacy-provider config when building and running middling-panda"
-        )
+        anyhow::anyhow!("{e}{}", dsa_auth_hint())
     })
 }
 
@@ -122,15 +120,14 @@ fn try_key_file(
         }
     }
 
-    let public_path = public_key_path(private_path);
+    let private_pem = secret
+        .to_openssh(ssh_key::LineEnding::LF)
+        .context("encode private key")?;
+    let public_openssh = disk_public.to_openssh().context("encode public key")?;
+
     session
-        .userauth_pubkey_file(
-            user,
-            public_path.as_deref(),
-            private_path,
-            None,
-        )
-        .with_context(|| format!("pubkey auth with {}", private_path.display()))?;
+        .userauth_pubkey_memory(user, Some(&public_openssh), &private_pem, None)
+        .map_err(|e| anyhow::anyhow!("pubkey auth with {}: {e}", private_path.display()))?;
 
     if session.authenticated() {
         debug!(
@@ -149,8 +146,7 @@ fn ssh_dir() -> Option<PathBuf> {
     dirs::home_dir().map(|h| h.join(".ssh"))
 }
 
-/// Companion `.pub` next to the private key, if present.
-fn public_key_path(private_path: &Path) -> Option<PathBuf> {
-    let candidate = private_path.with_extension("pub");
-    candidate.is_file().then_some(candidate)
+fn dsa_auth_hint() -> &'static str {
+    "\nHint: for ssh-dss keys set OPENSSL_CONF to config/openssl-legacy.cnf (OpenSSL 3 legacy provider). \
+     Ensure id_dsa.pub is beside the private key."
 }

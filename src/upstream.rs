@@ -39,8 +39,8 @@ fn handshake_failure_hint(session: &Session, err: &ssh2::Error) -> String {
 
     if kex_or_keys {
         return "\nHint: upstream may only offer ssh-dss host keys. OpenSSL 3 disables DSA \
-                unless the legacy provider is active at runtime. Try:\n  \
-                OPENSSL_CONF=/path/to/config/openssl-legacy.cnf middling-panda probe HOST PORT\n  \
+                unless the legacy provider is active. Try:\n  \
+                OPENSSL_CONF=$PWD/config/openssl-legacy.cnf middling-panda probe HOST PORT\n  \
                 (see README \"OpenSSL 3 and ssh-dss\")"
             .to_string();
     }
@@ -182,21 +182,26 @@ pub fn connect_and_auth_publickey(
     let addr_label = format!("{host}:{port}");
     let session = connect_upstream(host, port, data_dir, verify_host)?;
 
-    if userauth_publickey(&session, user, public_key)? {
-        log_upstream_established(&addr_label, user, &session);
-        return Ok(UpstreamSession { session });
-    }
-
+    // Fixed upstream identity wins over client key passthrough (DSA-only servers).
     if let Some(path) = upstream_identity {
         if userauth_identity_file(&session, user, path)? {
             log_upstream_established(&addr_label, user, &session);
             return Ok(UpstreamSession { session });
         }
+        anyhow::bail!(
+            "upstream identity auth failed for {user}@{addr_label} with {}",
+            path.display()
+        );
+    }
+
+    if userauth_publickey(&session, user, public_key)? {
+        log_upstream_established(&addr_label, user, &session);
+        return Ok(UpstreamSession { session });
     }
 
     anyhow::bail!(
         "upstream public-key auth failed for {user}@{addr_label} \
-         (no matching key in ssh-agent, ~/.ssh, or --upstream-identity)"
+         (no matching key in ssh-agent or ~/.ssh)"
     );
 }
 

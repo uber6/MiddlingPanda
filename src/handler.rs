@@ -351,13 +351,23 @@ impl ProxyHandler {
         user: &str,
         public_key: &PublicKey,
     ) -> Result<Auth, anyhow::Error> {
+        // Client may use Ed25519 to the panda; upstream uses --upstream-identity only.
+        if self.upstream_identity.is_some() {
+            return match self.establish_upstream(user, None).await {
+                Ok(()) => Ok(Auth::Accept),
+                Err(e) => {
+                    tracing::warn!(error = %e, "upstream identity auth failed (after client pubkey)");
+                    Ok(Auth::reject())
+                }
+            };
+        }
+
         let host = self.upstream_host.clone();
         let port = self.upstream_port;
         let data_dir = self.data_dir.clone();
         let verify = self.verify_upstream;
         let user = user.to_string();
         let public_key = public_key.clone();
-        let upstream_identity = self.upstream_identity.clone();
 
         let result = tokio::task::spawn_blocking(move || {
             connect_and_auth_publickey(
@@ -367,7 +377,7 @@ impl ProxyHandler {
                 &public_key,
                 &data_dir,
                 verify,
-                upstream_identity.as_deref(),
+                None,
             )
         })
         .await

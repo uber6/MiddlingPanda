@@ -2,7 +2,7 @@
 name = "middling-panda"
 version = "0.1.0"
 edition = "2021"
-description = "SSH crypto bridge: modern clients to legacy devices (incl. ssh-dss)"
+description = "SSH crypto bridge for Linux/WSL2: modern clients to legacy devices (incl. ssh-dss)"
 license = "MIT"
 
 [[bin]]

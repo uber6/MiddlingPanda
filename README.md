@@ -2,17 +2,35 @@
 
 SSH crypto bridge written in Rust. Connect with a **modern** OpenSSH client; MiddlingPanda negotiates **legacy** algorithms (including `ssh-dss`) to the real device via libssh2.
 
+**Platforms: Linux and WSL2.** Build and run on a Linux machine or inside WSL2 (not native Windows). OpenSSL development libraries are required.
+
 No server-side config file. The target host and port come from your SSH command (`%h` / `%p`).
 
 ## Build
+
+Install build dependencies so `cargo` can compile vendored **libssh2** against **OpenSSL**:
+
+**Fedora / RHEL (e.g. WSL Fedora 44):**
+
+```bash
+sudo dnf install gcc make pkgconf-pkg-config openssl-devel
+```
+
+**Debian / Ubuntu:**
+
+```bash
+sudo apt install build-essential pkg-config libssl-dev
+```
+
+Then:
 
 ```bash
 cargo build --release
 ```
 
-The binary is `target/release/middling-panda` (or `target\release\middling-panda.exe` on Windows).
+The binary is `target/release/middling-panda`.
 
-On Windows, libssh2 is built with **WinCNG** (no Perl/OpenSSL required). On Linux/macOS, libssh2 is compiled with OpenSSL from your environment.
+libssh2 is compiled with **OpenSSL** from your system.
 
 ### Building with `ssh-dss`
 
@@ -194,11 +212,19 @@ export OPENSSL_CONF="$PWD/config/openssl-legacy.cnf"
 middling-panda probe -v legacy-device.example 22
 ```
 
-On some distros you may also need `OPENSSL_MODULES` pointing at your OpenSSL modules directory (e.g. `/usr/lib64/ossl-modules` on Fedora).
+On Fedora you may also need:
 
-## WSL and SSH on the Windows host
+```bash
+export OPENSSL_MODULES=/usr/lib64/ossl-modules
+```
 
-In WSL2, `127.0.0.1` is the Linux VM’s loopback, not necessarily the Windows host where `sshd` listens. If SSH works from Windows but MiddlingPanda fails from WSL, target the Windows host IP:
+## WSL2
+
+Use the same build and `ProxyCommand` flow as on Linux (install deps from **Fedora** or **Debian** sections above).
+
+### Reaching `sshd` on the Windows host
+
+In WSL2, `127.0.0.1` is the Linux VM’s loopback, not the Windows host where `sshd` may listen. If direct SSH from Windows works but MiddlingPanda in WSL does not, use the Windows host IP:
 
 ```bash
 WIN_HOST=$(grep -m1 nameserver /etc/resolv.conf | awk '{print $2}')
@@ -219,6 +245,7 @@ ssh -o ProxyCommand="middling-panda proxy %h %p" admin@"$WIN_HOST"
 | **MVP** | Legacy algorithm set (incl. `ssh-dss` upstream) |
 | **MVP** | `probe` subcommand |
 | **MVP** | Upstream `known_hosts` + data-dir host key |
+| **Deferred** | Native Windows/macOS builds (use WSL2 on Windows) |
 | **Deferred** | Encrypted `~/.ssh` keys without agent (use `ssh-add` / `ssh -A`) |
 | **Deferred** | SFTP / `direct-tcpip` port forwarding |
 | **Deferred** | `listen` mode (TCP accept without per-connection `%h` `%p`) |

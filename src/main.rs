@@ -1,3 +1,6 @@
+#[cfg(not(target_os = "linux"))]
+compile_error!("middling-panda supports Linux and WSL2 only (build inside WSL, not native Windows)");
+
 mod data_dir;
 mod handler;
 mod legacy;
@@ -73,12 +76,17 @@ async fn main() -> anyhow::Result<()> {
         .with_writer(std::io::stderr)
         .init();
 
+    let mut upstream_identity = cli.upstream_identity;
+    if let Some(ref path) = upstream_identity {
+        upstream_identity = Some(resolve_identity_path(path)?);
+    }
+
     let data_dir = DataDir::new(cli.data_dir)?;
     let verify = !cli.no_verify_upstream;
 
     match cli.command {
         Command::Proxy { host, port } => {
-            proxy::run_proxy_stdio(&host, port, data_dir, verify, cli.upstream_identity).await?;
+            proxy::run_proxy_stdio(&host, port, data_dir, verify, upstream_identity).await?;
         }
         Command::Probe {
             host,
@@ -87,7 +95,7 @@ async fn main() -> anyhow::Result<()> {
             verbose,
         } => {
             let (host, port) = data_dir::parse_host_port(&host, port);
-            let identity = cli.upstream_identity.clone();
+            let identity = upstream_identity.clone();
             let report = tokio::task::spawn_blocking(move || {
                 if let (Some(user), Some(id_path)) = (user, identity) {
                     upstream::probe_auth(&host, port, &user, &id_path, &data_dir, verify, verbose)
@@ -105,4 +113,19 @@ async fn main() -> anyhow::Result<()> {
     }
 
     Ok(())
+}
+
+/// Turn a user-supplied identity path into an absolute path (ProxyCommand cwd varies).
+fn resolve_identity_path(path: &std::path::Path) -> anyhow::Result<PathBuf> {
+    let candidate = if path.is_relative() {
+        let cwd = std::env::current_dir().context("current directory for --upstream-identity")?;
+        cwd.join(path)
+    } else {
+        path.to_path_buf()
+    };
+    if !candidate.is_file() {
+        anyhow::bail!("upstream identity not found: {}", path.display());
+    }
+    std::fs::canonicalize(&candidate)
+        .with_context(|| format!("resolve identity path {}", path.display()))
 }
