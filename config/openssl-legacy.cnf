@@ -1,0 +1,17 @@
+# Enable DSA (ssh-dss) for libssh2 on OpenSSL 3.x
+# Usage: OPENSSL_CONF=/path/to/middling-panda/config/openssl-legacy.cnf middling-panda probe HOST PORT
+
+openssl_conf = openssl_init
+
+[openssl_init]
+providers = provider_sect
+
+[provider_sect]
+default = default_sect
+legacy = legacy_sect
+
+[default_sect]
+activate = 1
+
+[legacy_sect]
+activate = 1

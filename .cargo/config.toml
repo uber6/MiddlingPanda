@@ -1,0 +1,4 @@
+# libssh2 1.11+ omits ssh-dss unless compiled with LIBSSH2_DSA_ENABLE.
+# This applies to the vendored libssh2 built by libssh2-sys (Linux/macOS).
+[env]
+CFLAGS = { value = "-DLIBSSH2_DSA_ENABLE", force = true }

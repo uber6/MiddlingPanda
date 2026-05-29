@@ -1,0 +1,23 @@
+[package]
+name = "middling-panda"
+version = "0.1.0"
+edition = "2021"
+description = "SSH crypto bridge: modern clients to legacy devices (incl. ssh-dss)"
+license = "MIT"
+
+[[bin]]
+name = "middling-panda"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1"
+clap = { version = "4", features = ["derive", "env"] }
+dirs = "6"
+rand = "0.10"
+ssh-key = "0.7.0-rc.10"
+russh = { version = "0.61", default-features = false, features = ["ring"] }
+tokio = { version = "1", features = ["full"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+ssh2 = { version = "0.9", default-features = false }
