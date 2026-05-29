@@ -1,5 +1,7 @@
 # MiddlingPanda
 
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
+
 SSH crypto bridge written in Rust. Connect with a **modern** OpenSSH client; MiddlingPanda negotiates **legacy** algorithms (including `ssh-dss`) to the real device via libssh2.
 
 **Platforms: Linux and WSL2.** Build and run on a Linux machine or inside WSL2 (not native Windows). OpenSSL development libraries are required.
@@ -285,3 +287,7 @@ ssh -o ProxyCommand="middling-panda proxy %h %p" admin@"$WIN_HOST"
 ## Security
 
 Legacy crypto is weak by design. Run MiddlingPanda only on a management network; do not expose legacy algorithms on an internet-facing `sshd`.
+
+## License
+
+MiddlingPanda is licensed under the [Apache License, Version 2.0](LICENSE). See [LICENSE](LICENSE) for the full text.
